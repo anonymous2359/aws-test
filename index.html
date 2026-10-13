@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova – Chat</title>
+<style>
+:root{
+  --bg:#212121; --bg2:#171717; --bg3:#2f2f2f; --hover:#2a2a2a; --text:#ececec; --muted:#9b9b9b;
+  --border:#3a3a3a; --accent:#10a37f; --composer:#303030; --shadow:0 10px 40px rgba(0,0,0,.5);
+  --sbw:260px;
+}
+body:has(#theme:checked){
+  --bg:#ffffff; --bg2:#f9f9f9; --bg3:#ececec; --hover:#efefef; --text:#0d0d0d; --muted:#6b6b6b;
+  --border:#e3e3e3; --composer:#f4f4f4; --shadow:0 10px 40px rgba(0,0,0,.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font:16px/1.5 -apple-system,"Segoe UI",system-ui,Roboto,sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;overflow:hidden;transition:background .25s,color .25s}
+button,textarea{font:inherit;color:inherit;background:none;border:0;outline:0}
+button,summary,label{cursor:pointer}
+a{color:inherit;text-decoration:none}
+svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.hidden-input{position:absolute;opacity:0;pointer-events:none}
+.icon-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:var(--muted);transition:.15s}
+.icon-btn:hover{background:var(--hover);color:var(--text)}
+[data-tip]{position:relative}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#000;color:#fff;font-size:12px;padding:4px 8px;border-radius:8px;white-space:nowrap;z-index:50;pointer-events:none}
+
+/* ---------- Sidebar ---------- */
+.sidebar{width:var(--sbw);background:var(--bg2);display:flex;flex-direction:column;padding:8px;transition:margin .3s ease,transform .3s ease;flex:none;z-index:20}
+#sb:checked ~ .sidebar{margin-left:calc(var(--sbw) * -1)}
+.sb-top{display:flex;justify-content:space-between;align-items:center;padding:4px 0 8px}
+.logo{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#10a37f,#6c5ce7);color:#fff;font-weight:700}
+.sb-nav a,.sb-nav label{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;font-size:14px}
+.sb-nav a:hover,.sb-nav label:hover{background:var(--hover)}
+.search{margin:6px 0;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:10px;background:var(--hover)}
+.search input{background:none;border:0;outline:0;color:var(--text);padding:8px 0;width:100%;font-size:14px}
+.history{flex:1;overflow-y:auto;margin-top:8px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.history h6{font-size:12px;font-weight:600;color:var(--muted);padding:14px 10px 6px}
+.history a{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:10px;font-size:14px;white-space:nowrap;overflow:hidden;position:relative}
+.history a span{overflow:hidden;text-overflow:ellipsis}
+.history a:hover,.history a.active{background:var(--hover)}
+.history a .dots{opacity:0;color:var(--muted);letter-spacing:2px}
+.history a:hover .dots{opacity:1}
+.history a.pin::before{content:"📌";font-size:11px;margin-right:6px}
+.history:has(~ .x){}
+.profile{display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;margin-top:6px}
+.profile:hover{background:var(--hover)}
+.avatar{width:32px;height:32px;border-radius:50%;background:#7c3aed;display:grid;place-items:center;font-size:13px;font-weight:600;color:#fff}
+.profile small{display:block;color:var(--muted);font-size:12px;line-height:1.2}
+.profile b{font-size:14px;font-weight:500}
+.upgrade{margin-left:auto;font-size:12px;border:1px solid var(--border);padding:3px 10px;border-radius:99px}
+
+/* ---------- Main ---------- */
+main{flex:1;display:flex;flex-direction:column;min-width:0;position:relative}
+header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px}
+.hl,.hr{display:flex;align-items:center;gap:4px}
+.open-sb{display:none}
+#sb:checked ~ main .open-sb{display:grid}
+.model{position:relative}
+.model summary{list-style:none;display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:10px;font-size:18px;font-weight:500}
+.model summary::-webkit-details-marker{display:none}
+.model summary:hover,.model[open] summary{background:var(--hover)}
+.model summary em{color:var(--muted);font-style:normal}
+.model summary svg{width:16px;height:16px;color:var(--muted)}
+.menu{position:absolute;top:calc(100% + 6px);left:0;background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:8px;min-width:320px;box-shadow:var(--shadow);z-index:30;animation:pop .15s ease}
+@keyframes pop{from{opacity:0;transform:translateY(-6px) scale(.98)}}
+.menu label.opt{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px}
+.menu label.opt:hover{background:var(--hover)}
+.menu label.opt div{flex:1;font-size:15px}
+.menu label.opt small{display:block;color:var(--muted);font-size:12.5px}
+.menu .tick{opacity:0;color:var(--text)}
+.menu input:checked + label .tick{opacity:1}
+.pill{font-size:12px;background:var(--bg3);border:1px solid var(--border);padding:2px 8px;border-radius:99px;margin-left:6px;color:var(--muted)}
+.temp-pill{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:99px;font-size:14px;border:1px solid var(--border)}
+.temp-pill:hover{background:var(--hover)}
+.share{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:99px;font-size:14px}
+.share:hover{background:var(--hover)}
+
+.stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px 20px;overflow-y:auto}
+.hello{font-size:clamp(24px,3.4vw,32px);font-weight:600;text-align:center;margin-bottom:28px;animation:rise .6s ease both}
+.hello span{background:linear-gradient(90deg,var(--accent),#6c5ce7,#ec4899);-webkit-background-clip:text;background-clip:text;color:transparent}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}}
+
+/* Composer */
+.composer-wrap{width:100%;max-width:768px;animation:rise .6s .1s ease both}
+.composer{background:var(--composer);border-radius:28px;padding:10px 12px;border:1px solid transparent;transition:border .2s,box-shadow .2s;position:relative}
+.composer:focus-within{border-color:var(--border);box-shadow:0 0 0 4px rgba(16,163,127,.08)}
+.composer textarea{width:100%;resize:none;field-sizing:content;min-height:28px;max-height:200px;padding:6px 8px;font-size:16px;line-height:1.5;overflow-y:auto}
+.composer textarea::placeholder{color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:4px 6px}
+.chip{display:none;align-items:center;gap:6px;background:var(--bg3);border-radius:99px;padding:4px 10px 4px 8px;font-size:13px;color:var(--accent)}
+#t-search:checked ~ .chips .c-search,#t-think:checked ~ .chips .c-think,#t-image:checked ~ .chips .c-image,#t-canvas:checked ~ .chips .c-canvas{display:flex}
+.cbar{display:flex;align-items:center;justify-content:space-between;margin-top:4px}
+.cl,.cr{display:flex;align-items:center;gap:2px;position:relative}
+.tool-btn{display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;font-size:14px;color:var(--muted)}
+.tool-btn:hover{background:var(--hover);color:var(--text)}
+.send{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--text);color:var(--bg);transition:.2s}
+.send svg{stroke-width:2.4}
+.composer:has(textarea:placeholder-shown) .send{opacity:.25;pointer-events:none}
+.composer:has(textarea:placeholder-shown) .mic{display:grid}
+.composer:not(:has(textarea:placeholder-shown)) .mic{display:none}
+.plus-menu{display:none;position:absolute;bottom:calc(100% + 8px);left:0;background:var(--bg3);border:1px solid var(--border);border-radius:16px;padding:8px;min-width:260px;box-shadow:var(--shadow);z-index:30;animation:pop .15s ease}
+.plus-menu label,.plus-menu a{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:10px;font-size:14.5px}
+.plus-menu label:hover,.plus-menu a:hover{background:var(--hover)}
+.plus-menu hr{border:0;border-top:1px solid var(--border);margin:6px 0}
+#plus:checked ~ .cbar .plus-menu{display:block}
+.plus-menu label .ck{margin-left:auto;opacity:0;color:var(--accent)}
+#t-search:checked ~ .cbar label[for=t-search] .ck,#t-think:checked ~ .cbar label[for=t-think] .ck,#t-image:checked ~ .cbar label[for=t-image] .ck,#t-canvas:checked ~ .cbar label[for=t-canvas] .ck{opacity:1}
+.tool-btn.on{color:var(--accent)}
+
+/* Suggestions */
+.suggest{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:18px;max-width:768px}
+.suggest button{display:flex;align-items:center;gap:8px;padding:9px 16px;border-radius:99px;border:1px solid var(--border);font-size:14px;transition:.15s}
+.suggest button:hover{background:var(--hover);transform:translateY(-2px)}
+.suggest button svg{width:17px;height:17px}
+.i1{color:#4cc2ff}.i2{color:#f5a623}.i3{color:#ff6b6b}.i4{color:#7ee787}.i5{color:#c792ea}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;width:100%;max-width:768px;margin-top:22px}
+.card{border:1px solid var(--border);border-radius:16px;padding:14px 16px;text-align:left;transition:.2s}
+.card:hover{background:var(--hover);transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.card b{display:block;font-size:14.5px;font-weight:600}
+.card small{color:var(--muted);font-size:13px}
+.disclaimer{font-size:12px;color:var(--muted);text-align:center;padding:0 16px 12px}
+.disclaimer a{text-decoration:underline}
+
+/* ---------- Conversation view ---------- */
+.thread{display:none;width:100%;max-width:768px;flex:1;flex-direction:column;gap:26px;padding:12px 0 24px}
+body.chatting .thread{display:flex}
+body.chatting .hero{display:none!important}
+body.chatting .stage{justify-content:flex-start;padding-bottom:0}
+body.chatting .composer-wrap{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 18px);padding-bottom:6px;animation:none}
+.msg{display:flex;gap:12px;animation:rise .35s ease both}
+.msg.user{justify-content:flex-end}
+.bub{background:var(--composer);padding:10px 18px;border-radius:22px;max-width:75%;white-space:pre-wrap;word-break:break-word}
+.av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;flex:none;background:linear-gradient(135deg,#10a37f,#6c5ce7);color:#fff;font-weight:700;font-size:14px;margin-top:2px}
+.msg .body{flex:1;min-width:0}
+.txt{line-height:1.7;word-break:break-word}
+.txt p{margin:0}
+.txt .gap{height:12px}
+.txt h4{font-size:16px;margin:14px 0 4px}
+.txt ul,.txt ol{margin:6px 0 6px 22px}
+.txt li{margin:3px 0}
+.txt code{background:var(--bg3);padding:1px 6px;border-radius:6px;font:13.5px ui-monospace,Menlo,Consolas,monospace}
+.txt pre{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:14px 16px;overflow:auto;margin:10px 0}
+.txt pre code{background:none;padding:0;font-size:13.5px;line-height:1.6}
+.genimg{width:min(360px,100%);aspect-ratio:1;border-radius:16px;margin:8px 0;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+.dots{display:inline-flex;gap:5px;vertical-align:middle;padding:6px 0}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--muted);animation:bounce 1s infinite ease-in-out}
+.dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.5}30%{transform:translateY(-6px);opacity:1}}
+.think{color:var(--muted);margin-right:8px;font-size:14px;animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.4}}
+.acts{display:flex;gap:2px;margin-top:6px;opacity:0;pointer-events:none;transition:.2s}
+.msg.done .acts{opacity:1;pointer-events:auto}
+.acts button{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.acts button:hover{background:var(--hover);color:var(--text)}
+.acts button.on{color:var(--accent)}
+.acts svg{width:17px;height:17px}
+body.busy .send{opacity:.25;pointer-events:none}
+
+.field{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;margin-top:8px;outline:0}
+.field:focus{border-color:var(--accent)}
+.keybox{display:flex;gap:8px;align-items:center}
+.keybox .field{flex:1}
+.ghost{background:transparent;color:var(--text);border:1px solid var(--border);padding:8px 14px;border-radius:99px;font-size:13px}
+.ghost:hover{background:var(--hover)}
+.stack{display:block!important}
+.stack .acts2{display:flex;gap:8px;margin-top:10px;align-items:center}
+.ok{color:var(--accent)}
+/* Modals via :target */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;place-items:center;z-index:100;backdrop-filter:blur(3px)}
+.modal:target{display:grid;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.dialog{background:var(--bg3);border-radius:20px;width:min(560px,92vw);padding:24px;box-shadow:var(--shadow);animation:pop .2s ease;max-height:86vh;overflow:auto}
+.dialog h2{font-size:18px;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center}
+.dialog p.sub{color:var(--muted);font-size:14px;margin-bottom:16px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--border);font-size:15px}
+.row small{display:block;color:var(--muted);font-size:13px}
+.switch{position:relative;width:42px;height:24px;border-radius:99px;background:#555;transition:.2s;flex:none}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+input:checked + .switch{background:var(--accent)}
+input:checked + .switch::after{transform:translateX(18px)}
+.linkbox{display:flex;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:6px 6px 6px 14px;align-items:center;font-size:14px;color:var(--muted)}
+.btn{background:var(--text);color:var(--bg);padding:8px 16px;border-radius:99px;font-size:14px;font-weight:600;display:inline-block}
+.plans{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.plan{border:1px solid var(--border);border-radius:16px;padding:16px}
+.plan.hot{border-color:var(--accent)}
+.plan h3{font-size:16px}.plan .price{font-size:28px;font-weight:700;margin:6px 0}
+.plan ul{list-style:none;font-size:13.5px;color:var(--muted);margin:10px 0}
+.plan li::before{content:"✓ ";color:var(--accent)}
+.close{width:32px;height:32px;display:grid;place-items:center;border-radius:50%}
+.close:hover{background:var(--hover)}
+.kbd{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:1px 7px;font-size:12px}
+
+/* Toast */
+.toast{position:fixed;bottom:90px;left:50%;transform:translate(-50%,30px);background:var(--text);color:var(--bg);padding:10px 18px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:.3s;z-index:200}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* Mobile */
+@media (max-width:820px){
+  .sidebar{position:fixed;inset:0 auto 0 0;margin-left:0;transform:translateX(0);box-shadow:var(--shadow)}
+  #sb:checked ~ .sidebar{margin-left:0;transform:translateX(-105%)}
+  #sb:not(:checked) ~ .scrim{display:block}
+  .open-sb{display:grid!important}
+  .temp-pill span,.share span{display:none}
+  .menu{min-width:280px}
+  .plans{grid-template-columns:1fr}
+}
+.scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:15}
+@media (min-width:821px){.scrim{display:none!important}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- state checkboxes (CSS-only toggles) -->
+<input type="checkbox" id="sb" class="hidden-input" aria-label="Collapse sidebar">
+<input type="checkbox" id="theme" class="hidden-input" aria-label="Light theme">
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar">
+  <div class="sb-top">
+    <a href="#" onclick="return newChat()" class="logo" aria-label="Nova home">N</a>
+    <label for="sb" class="icon-btn" data-tip="Close sidebar" aria-label="Close sidebar">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+    </label>
+  </div>
+
+  <nav class="sb-nav">
+    <a href="#" onclick="return newChat()"><svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>New chat</a>
+    <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="search" placeholder="Search chats" aria-label="Search chats"></label>
+    <a href="#"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Library</a>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Explore tools</a>
+    <a href="#"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Projects</a>
+  </nav>
+
+  <div class="history">
+    <h6>Pinned</h6>
+    <a href="#" class="pin"><span>Weekly meal prep plan</span><span class="dots">•••</span></a>
+    <h6>Today</h6>
+    <a href="#" class="active"><span>Debug my CSS grid layout</span><span class="dots">•••</span></a>
+    <a href="#"><span>Ideas for a birthday surprise</span><span class="dots">•••</span></a>
+    <a href="#"><span>Explain quantum tunnelling simply</span><span class="dots">•••</span></a>
+    <h6>Yesterday</h6>
+    <a href="#"><span>Cover letter for design role</span><span class="dots">•••</span></a>
+    <a href="#"><span>Python script to rename files</span><span class="dots">•••</span></a>
+    <a href="#"><span>Trip to Jaipur – 3 day itinerary</span><span class="dots">•••</span></a>
+    <h6>Previous 7 days</h6>
+    <a href="#"><span>SQL window functions cheat sheet</span><span class="dots">•••</span></a>
+    <a href="#"><span>Poem about monsoon evenings</span><span class="dots">•••</span></a>
+    <a href="#"><span>Compare index funds vs ETFs</span><span class="dots">•••</span></a>
+    <a href="#"><span>Fix my sourdough starter</span><span class="dots">•••</span></a>
+    <h6>Previous 30 days</h6>
+    <a href="#"><span>Regex to validate phone numbers</span><span class="dots">•••</span></a>
+    <a href="#"><span>Workout routine for beginners</span><span class="dots">•••</span></a>
+    <a href="#"><span>Summarise the attached PDF</span><span class="dots">•••</span></a>
+  </div>
+
+  <a href="#settings" class="profile">
+    <div class="avatar">KA</div>
+    <div><b>Kanishk Agarwal</b><small>Free plan</small></div>
+    <span class="upgrade" onclick="event.stopPropagation()">Upgrade</span>
+  </a>
+</aside>
+<label for="sb" class="scrim"></label>
+
+<!-- ============ MAIN ============ -->
+<main>
+  <header>
+    <div class="hl">
+      <label for="sb" class="icon-btn open-sb" data-tip="Open sidebar" aria-label="Open sidebar">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>
+      </label>
+      <a href="#" onclick="return newChat()" class="icon-btn open-sb" data-tip="New chat" aria-label="New chat"><svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></a>
+
+      <details class="model">
+        <summary><span id="modelName">nemotron-3.5-lightning</span> <em>free</em> <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></summary>
+        <div class="menu">
+          <input type="radio" name="m" id="m1" class="hidden-input" checked>
+          <label class="opt" for="m1"><div>Standard<small>Balanced answers (default)</small></div><svg class="tick" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></label>
+          <input type="radio" name="m" id="m2" class="hidden-input">
+          <label class="opt" for="m2"><div>Thinking mode<small>Asks the model to reason step by step</small></div><svg class="tick" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></label>
+          <input type="radio" name="m" id="m3" class="hidden-input">
+          <label class="opt" for="m3"><div>Fast mode<small>Shorter, quicker answers</small></div><svg class="tick" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></label>
+          <hr style="border:0;border-top:1px solid var(--border);margin:6px 0">
+          <a class="opt" href="#settings" style="display:flex;gap:12px;padding:10px 12px;border-radius:10px;font-size:15px">Change model in Settings</a>
+        </div>
+      </details>
+    </div>
+
+    <div class="hr">
+      <a href="#" class="temp-pill" data-tip="Chat won't be saved">
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px"><circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/></svg><span>Temporary</span>
+      </a>
+      <a href="#share" class="share"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 8l5-5 5 5M5 14v5a2 2 0 002 2h10a2 2 0 002-2v-5"/></svg><span>Share</span></a>
+      <label for="theme" class="icon-btn" data-tip="Toggle theme" aria-label="Toggle theme">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </label>
+      <a href="#settings" class="icon-btn" data-tip="Settings" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></a>
+    </div>
+  </header>
+
+  <section class="stage">
+    <h1 class="hello hero" id="hello"><span>What's on your mind today?</span></h1>
+
+    <div class="thread" id="thread" aria-live="polite"></div>
+
+    <form class="composer-wrap" onsubmit="return send(event)">
+      <div class="composer">
+        <input type="checkbox" id="plus" class="hidden-input">
+        <input type="checkbox" id="t-search" class="hidden-input">
+        <input type="checkbox" id="t-think" class="hidden-input">
+        <input type="checkbox" id="t-image" class="hidden-input">
+        <input type="checkbox" id="t-canvas" class="hidden-input">
+
+        <div class="chips">
+          <span class="chip c-search"><svg viewBox="0 0 24 24" style="width:15px;height:15px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>Search</span>
+          <span class="chip c-think"><svg viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 2z"/></svg>Think</span>
+          <span class="chip c-image"><svg viewBox="0 0 24 24" style="width:15px;height:15px"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>Create image</span>
+          <span class="chip c-canvas"><svg viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>Canvas</span>
+        </div>
+
+        <textarea id="prompt" rows="1" placeholder="Ask anything" aria-label="Message Nova"></textarea>
+
+        <div class="cbar">
+          <div class="cl">
+            <label for="plus" class="icon-btn" data-tip="Add files and more" aria-label="Add files and more">
+              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            </label>
+            <label for="t-search" class="tool-btn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>Search</label>
+            <label for="t-think" class="tool-btn"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 2z"/></svg>Think</label>
+
+            <div class="plus-menu">
+              <label for="file"><svg viewBox="0 0 24 24"><path d="M21 12l-8.5 8.5a5.5 5.5 0 01-7.8-7.8L13.5 4a3.7 3.7 0 115.2 5.2L10 18a1.8 1.8 0 01-2.6-2.6L15 8"/></svg>Add photos &amp; files</label>
+              <label for="t-image"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>Create image<svg class="ck" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></label>
+              <label for="t-canvas"><svg viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>Canvas<svg class="ck" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></label>
+              <label for="t-think"><svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 2z"/></svg>Think longer<svg class="ck" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></label>
+              <label for="t-search"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18"/></svg>Web search<svg class="ck" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></label>
+              <hr>
+              <a href="#plans"><svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .6-5.3 4.7 1.6 7.2L12 17.8 5.7 21.5l1.6-7.2L2 9.6 9 9z"/></svg>Deep research <span class="pill">Plus</span></a>
+            </div>
+            <input type="file" id="file" class="hidden-input" multiple>
+          </div>
+
+          <div class="cr">
+            <button type="button" class="icon-btn mic" data-tip="Dictate" aria-label="Dictate"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v4"/></svg></button>
+            <button type="button" class="icon-btn" data-tip="Voice mode" aria-label="Voice mode" style="background:var(--text);color:var(--bg);border-radius:50%"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 6v12M12 3v18M16 7v10M20 10v4"/></svg></button>
+            <button type="submit" class="send" aria-label="Send"><svg viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <div class="suggest hero">
+      <button type="button" data-p="Create an image of a cozy reading nook at sunset"><svg class="i1" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>Create image</button>
+      <button type="button" data-p="Summarize this text in five bullet points: "><svg class="i2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Summarize text</button>
+      <button type="button" data-p="Help me write a Python function that "><svg class="i3" viewBox="0 0 24 24"><path d="M8 8l-5 4 5 4M16 8l5 4-5 4M14 4l-4 16"/></svg>Code</button>
+      <button type="button" data-p="Give me a surprise fact that will blow my mind"><svg class="i4" viewBox="0 0 24 24"><path d="M12 2l2.5 6.5L21 9l-5 4.5L17.5 21 12 17l-5.5 4L8 13.5 3 9l6.5-.5z"/></svg>Surprise me</button>
+      <button type="button" data-p="Make a plan to learn Spanish in 3 months"><svg class="i5" viewBox="0 0 24 24"><path d="M2 4h7a3 3 0 013 3v14a2 2 0 00-2-2H2zM22 4h-7a3 3 0 00-3 3v14a2 2 0 012-2h8z"/></svg>Make a plan</button>
+      <button type="button" data-p="Brainstorm names for my new coffee shop"><svg class="i2" viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 2z"/></svg>Brainstorm</button>
+    </div>
+
+    <div class="cards hero">
+      <a href="#" class="card"><b>🧠 Study mode</b><small>Learn any topic step by step</small></a>
+      <a href="#" class="card"><b>📊 Analyze data</b><small>Upload a CSV and get charts</small></a>
+      <a href="#" class="card"><b>✈️ Plan a trip</b><small>Itineraries in seconds</small></a>
+      <a href="#" class="card"><b>✉️ Draft an email</b><small>Tone-matched and polished</small></a>
+    </div>
+  </section>
+
+  <p class="disclaimer">Nova can make mistakes. Check important info. <a href="#settings">See Cookie Preferences</a>.</p>
+</main>
+
+<!-- ============ MODALS ============ -->
+<div class="modal" id="share">
+  <div class="dialog">
+    <h2>Share chat <a href="#" class="close" aria-label="Close">✕</a></h2>
+    <p class="sub">Anyone with the link can view this conversation. Messages you add later stay private.</p>
+    <div class="linkbox"><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">https://nova.example/share/9f3a-demo</span><a href="#" class="btn" onclick="toast('Link copied')">Copy link</a></div>
+    <div class="row" style="margin-top:16px"><div>Include my name<small>Show “Kanishk Agarwal” on the shared page</small></div><label><input type="checkbox" class="hidden-input" checked><span class="switch"></span></label></div>
+  </div>
+</div>
+
+<div class="modal" id="settings">
+  <div class="dialog">
+    <h2>Settings <a href="#" class="close" aria-label="Close">✕</a></h2>
+    <p class="sub">Personalise how Nova looks and behaves.</p>
+    <div class="row stack">
+      <div>API key override (optional)<small>Leave empty to use the server key. Stored only in this browser. Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="text-decoration:underline">openrouter.ai/keys</a></small></div>
+      <div class="keybox"><input class="field" type="password" id="orKey" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false"><button type="button" class="ghost" onclick="toggleKey()">Show</button></div>
+      <small id="keyState" style="margin-top:6px"></small>
+    </div>
+    <div class="row stack">
+      <div>Model<small>Any OpenRouter model ID</small></div>
+      <input class="field" type="text" id="orModel" placeholder="nvidia/nemotron-3.5-lightning:free" autocomplete="off" spellcheck="false">
+      <div class="acts2"><button type="button" class="btn" onclick="saveSettings()" style="border:0">Save</button><button type="button" class="ghost" onclick="clearKey()">Remove key</button></div>
+    </div>
+    <div class="row"><div>Light theme<small>Switch between dark and light</small></div><label for="theme"><span class="switch" style="background:#555"></span></label></div>
+    <div class="row"><div>Memory<small>Let Nova remember useful details</small></div><label><input type="checkbox" class="hidden-input" checked><span class="switch"></span></label></div>
+    <div class="row"><div>Improve the model for everyone<small>Use my chats to train future models</small></div><label><input type="checkbox" class="hidden-input"><span class="switch"></span></label></div>
+    <div class="row"><div>Always show code when using data analysis</div><label><input type="checkbox" class="hidden-input"><span class="switch"></span></label></div>
+    <div class="row"><div>Voice<small>Choose how Nova sounds</small></div>
+      <select style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:10px;padding:6px 10px"><option>Sky</option><option>Ember</option><option>Juniper</option></select></div>
+    <div class="row"><div>Keyboard shortcuts<small><span class="kbd">Ctrl</span> + <span class="kbd">K</span> new chat · <span class="kbd">Ctrl</span> + <span class="kbd">/</span> shortcuts</small></div></div>
+    <div class="row"><a href="#plans" class="btn">Upgrade plan</a><a href="#" class="btn" style="background:transparent;color:#ff6b6b;border:1px solid var(--border)">Log out</a></div>
+  </div>
+</div>
+
+<div class="modal" id="plans">
+  <div class="dialog" style="width:min(680px,94vw)">
+    <h2>Upgrade your plan <a href="#" class="close" aria-label="Close">✕</a></h2>
+    <p class="sub">Unlock more models, longer limits and deep research.</p>
+    <div class="plans">
+      <div class="plan"><h3>Free</h3><div class="price">₹0</div><ul><li>Access to Nova 5</li><li>Limited file uploads</li><li>Basic voice mode</li></ul><a href="#" class="btn" style="background:var(--hover);color:var(--text)">Your current plan</a></div>
+      <div class="plan hot"><h3>Plus</h3><div class="price">₹1,999<small style="font-size:13px;color:var(--muted)">/mo</small></div><ul><li>Nova 5 Thinking</li><li>Deep research</li><li>Higher limits &amp; image generation</li></ul><a href="#" class="btn" onclick="toast('Demo only – no payment')">Get Plus</a></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s), p=$('#prompt'), th=$('#thread'), stage=$('.stage');
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+let busy=false, started=false, histEl=null, timer=null;
+const mem={name:null};
+const hist=[]; // conversation sent to the AI
+
+/* ---------- tiny markdown renderer ---------- */
+function inline(s){
+  s=esc(s).replace(/`([^`\n]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  s=s.replace(/\[\[img:(\d+)\]\]/g,(m,n)=>{const h=n%360;return `<div class="genimg" style="background:radial-gradient(circle at 30% 30%,hsl(${h},85%,65%),transparent 55%),radial-gradient(circle at 75% 70%,hsl(${(h+80)%360},80%,55%),transparent 55%),linear-gradient(135deg,hsl(${(h+200)%360},60%,22%),hsl(${(h+40)%360},70%,40%))"></div>`});
+  return s;
+}
+function md(src){
+  if((src.match(/```/g)||[]).length%2) src+='\n```';
+  return src.split(/```/).map((part,i)=>{
+    if(i%2){const nl=part.indexOf('\n');return `<pre><code>${esc(part.slice(nl+1).replace(/\n$/,''))}</code></pre>`}
+    const lines=part.split('\n'),out=[];let list=null;
+    for(const ln of lines){
+      let m;
+      if((m=ln.match(/^\s*[-•] (.*)/))){ if(list!=='ul'){if(list)out.push(`</${list}>`);out.push('<ul>');list='ul'} out.push(`<li>${inline(m[1])}</li>`)}
+      else if((m=ln.match(/^\s*\d+\. (.*)/))){ if(list!=='ol'){if(list)out.push(`</${list}>`);out.push('<ol>');list='ol'} out.push(`<li>${inline(m[1])}</li>`)}
+      else{ if(list){out.push(`</${list}>`);list=null}
+        if((m=ln.match(/^#{1,3} (.*)/))) out.push(`<h4>${inline(m[1])}</h4>`);
+        else if(ln.trim()==='') out.push('<div class="gap"></div>');
+        else out.push(`<p>${inline(ln)}</p>`)}
+    }
+    if(list)out.push(`</${list}>`);
+    return out.join('');
+  }).join('');
+}
+
+/* ---------- built-in reply engine (no AI, rule-based) ---------- */
+const jokes=["Why do programmers prefer dark mode? Because light attracts bugs. 🐛","I would tell you a UDP joke, but you might not get it.","There are 10 kinds of people: those who understand binary and those who don't.","Why did the developer go broke? He used up all his cache. 💸","A SQL query walks into a bar, walks up to two tables and asks: “Can I join you?”"];
+const facts=["Honey never spoils — edible honey has been found in 3,000-year-old Egyptian tombs. 🍯","Octopuses have three hearts and blue blood. 🐙","A day on Venus is longer than its year.","Bananas are berries, but strawberries aren't. 🍌","Sharks are older than trees — they've been around for 400+ million years. 🦈"];
+const poems=["**Monsoon Evening**\n\nThe sky unbuttons its grey coat,\nand the first drops land like small applause.\nChai steams on the window ledge,\nthe whole street breathing in the rain.","**Quiet Code**\n\nA cursor blinks in the dark,\nwaiting, patient as a tide.\nOne small fix — the green check glows,\nand the night feels half as wide.","**Haiku**\n\nSoft light on the desk —\na cup of tea cools slowly,\nideas warm the room."];
+const code={
+ fizzbuzz:{py:"for i in range(1, 101):\n    if i % 15 == 0: print('FizzBuzz')\n    elif i % 3 == 0: print('Fizz')\n    elif i % 5 == 0: print('Buzz')\n    else: print(i)",js:"for (let i = 1; i <= 100; i++) {\n  console.log(i % 15 === 0 ? 'FizzBuzz' : i % 3 === 0 ? 'Fizz' : i % 5 === 0 ? 'Buzz' : i);\n}"},
+ palindrome:{py:"def is_palindrome(s):\n    t = ''.join(c.lower() for c in s if c.isalnum())\n    return t == t[::-1]",js:"const isPalindrome = s => {\n  const t = s.toLowerCase().replace(/[^a-z0-9]/g, '');\n  return t === [...t].reverse().join('');\n};"},
+ factorial:{py:"def factorial(n):\n    return 1 if n <= 1 else n * factorial(n - 1)",js:"const factorial = n => (n <= 1 ? 1 : n * factorial(n - 1));"},
+ fibonacci:{py:"def fib(n):\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a",js:"function fib(n) {\n  let [a, b] = [0, 1];\n  for (let i = 0; i < n; i++) [a, b] = [b, a + b];\n  return a;\n}"},
+ reverse:{py:"def reverse(s):\n    return s[::-1]",js:"const reverse = s => [...s].reverse().join('');"},
+ prime:{py:"def is_prime(n):\n    if n < 2: return False\n    for i in range(2, int(n ** 0.5) + 1):\n        if n % i == 0: return False\n    return True",js:"const isPrime = n => {\n  if (n < 2) return false;\n  for (let i = 2; i * i <= n; i++) if (n % i === 0) return false;\n  return true;\n};"},
+ sort:{py:"def bubble_sort(a):\n    a = a[:]\n    for i in range(len(a)):\n        for j in range(len(a) - i - 1):\n            if a[j] > a[j + 1]:\n                a[j], a[j + 1] = a[j + 1], a[j]\n    return a",js:"const bubbleSort = arr => {\n  const a = [...arr];\n  for (let i = 0; i < a.length; i++)\n    for (let j = 0; j < a.length - i - 1; j++)\n      if (a[j] > a[j + 1]) [a[j], a[j + 1]] = [a[j + 1], a[j]];\n  return a;\n};"}
+};
+const caps=s=>s.replace(/\b\w/g,c=>c.toUpperCase());
+const hash=s=>[...s].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,7);
+
+function reply(q,o){
+  const t=q.trim(), l=t.toLowerCase();
+  let m;
+  // memory
+  if((m=t.match(/my name is ([\w' -]{1,30})/i))){mem.name=caps(m[1].trim());return `Nice to meet you, **${mem.name}**! 👋 I'll remember that for this chat. What can I help you with?`}
+  if(/what('| i)?s my name|who am i|do you know my name/i.test(l)) return mem.name?`Your name is **${mem.name}**. 😊`:"I don't know your name yet — tell me with “my name is …”.";
+  // image
+  if(o.image||/\b(create|generate|draw|make|paint)\b.*\b(image|picture|photo|illustration|art|logo|wallpaper)\b/.test(l)){
+    const subject=t.replace(/^(please\s+)?(create|generate|draw|make|paint)( me)?( an?| the)?( image| picture| photo| illustration)?( of)?/i,'').trim()||'your idea';
+    return `Here's a stylised preview for **“${subject}”** (a generated gradient — this demo has no real image model):\n\n[[img:${hash(subject)}]]\n\nTo get a great result from a real image model, try adding:\n- **Style:** watercolor, 3D render, cinematic photo\n- **Lighting:** golden hour, soft studio light\n- **Composition:** close-up, wide shot, top-down`}
+  // greetings
+  if(/^(hi|hello|hey|hola|namaste|yo|sup|good (morning|afternoon|evening))\b/.test(l)) return pick([`Hello${mem.name?', '+mem.name:''}! 👋 How can I help you today?`,`Hey${mem.name?' '+mem.name:''}! What are we working on?`,`Namaste! 🙏 Ask me anything — code, plans, writing, maths.`]);
+  if(/how are you|how('| i)?s it going|what('| i)?s up/.test(l)) return "I'm doing great, thanks for asking! Ready to help — what's on your mind?";
+  if(/who are you|what are you|your name|what can you do|^help$|capabilities/.test(l)) return "I'm **Nova**, a demo chat assistant built with HTML + CSS and a few lines of JavaScript. 🙂\n\nThis page uses a **built-in rule-based responder** (no real AI model behind it), so I can handle things like:\n- Maths: `what is 24*7+3`\n- Code snippets: `python function for fibonacci`\n- Plans: `plan to learn guitar in 3 months`\n- Writing: poems, emails, summaries, name ideas\n- Fun: jokes and random facts\n- Time and date\n\nFor open-ended questions you'd connect this UI to a real model API.";
+  if(/^(thanks|thank you|thx|ty)\b/.test(l)) return pick(["You're welcome! 😊","Anytime! Anything else?","Glad I could help!"]);
+  if(/^(bye|goodbye|see you|good night)\b/.test(l)) return "Goodbye! Come back whenever you like. 👋";
+  // time/date
+  if(/\b(time)\b/.test(l)&&/what|current|now|tell/.test(l)) return `It's **${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}** on your device clock.`;
+  if(/\b(date|day|today)\b/.test(l)&&/what|current|tell|today/.test(l)&&!/plan|write|email/.test(l)) return `Today is **${new Date().toLocaleDateString([], {weekday:'long',year:'numeric',month:'long',day:'numeric'})}**.`;
+  // maths
+  const mm=t.replace(/^(what('| i)?s|calculate|calc|solve|compute|evaluate)\s*/i,'').replace(/[=?]/g,'').trim();
+  if(/^[\d\s+\-*/().%^x×÷]+$/.test(mm)&&/\d/.test(mm)&&/[+\-*/%^x×÷]/.test(mm)){
+    try{const v=Function('"use strict";return ('+mm.replace(/[x×]/g,'*').replace(/÷/g,'/').replace(/\^/g,'**')+')')();
+      if(Number.isFinite(v)) return `**${mm} = ${+v.toFixed(8)}**`}catch(e){}
+  }
+  if((m=l.match(/(\d+(?:\.\d+)?)\s*% of\s*(\d+(?:\.\d+)?)/))) return `**${m[1]}% of ${m[2]} = ${+(m[1]*m[2]/100).toFixed(6)}**`;
+  // fun
+  if(/\bjoke\b|make me laugh/.test(l)) return pick(jokes);
+  if(/\bfact\b|surprise me|something interesting/.test(l)) return "Here's one:\n\n"+pick(facts);
+  if(/\b(poem|poetry|haiku|verse)\b/.test(l)) return pick(poems);
+  // code
+  if(/\b(code|function|script|program|python|javascript|js|algorithm)\b/.test(l)){
+    const lang=/javascript|\bjs\b|node/.test(l)?'js':'py', name=lang==='js'?'javascript':'python';
+    for(const k in code) if(l.includes(k)||(k==='reverse'&&/reverse/.test(l))) return `Here's a clean ${name} version:\n\n\`\`\`${name}\n${code[k][lang]}\n\`\`\`\n\nWant it explained line by line, or with test cases?`;
+    return `Here's a starter template — tell me exactly what it should do and I'll fill it in:\n\n\`\`\`${name}\n${lang==='js'?"function solve(input) {\n  // TODO: implement\n  return input;\n}\n\nconsole.log(solve('hello'));":"def solve(data):\n    # TODO: implement\n    return data\n\n\nif __name__ == '__main__':\n    print(solve('hello'))"}\n\`\`\`\n\nTry asking for: **fizzbuzz, palindrome, factorial, fibonacci, reverse, prime, sort**.`}
+  if(/\b(css|html|flexbox|grid)\b/.test(l)) return "Here's a handy centering snippet:\n\n```css\n.center {\n  display: grid;\n  place-items: center;\n  min-height: 100vh;\n}\n```\n\nTip: `grid` + `place-items: center` is the shortest way to center both axes. Want a responsive card layout next?";
+  // plan
+  if((m=t.match(/(?:learn|master|study|get good at|plan (?:to|for))\s+(.+?)(?:\s+in\s+(\d+)\s*(day|week|month)s?)?[.?!]?$/i))){
+    const topic=m[1].replace(/^to\s+/,''),n=m[2]||3,u=m[3]||'month',P=Math.max(1,Math.round(+n));
+    return `Here's a **${P}-${u} plan to learn ${topic}**:\n\n### Phase 1 — Foundations (first third)\n- Set a clear goal and a daily 30–45 minute slot\n- Learn the core vocabulary / basics of ${topic}\n- Do tiny exercises every day\n\n### Phase 2 — Practice (middle third)\n- Build or do one small real project with ${topic}\n- Get feedback from a community or mentor\n- Track mistakes in a notebook\n\n### Phase 3 — Mastery (final third)\n- Take on a bigger challenge or mock test\n- Teach what you learned to someone\n- Review, refine and plan what's next\n\nWant this broken into a week-by-week checklist?`}
+  // email
+  if(/\bemail|e-mail|mail to\b/.test(l)){
+    const about=(t.match(/(?:about|regarding|for|to ask|to)\s+(.+)$/i)||[,'the topic'])[1].replace(/[.?!]$/,'');
+    return `**Subject:** Regarding ${about}\n\nHi [Name],\n\nI hope you're doing well. I'm writing about ${about}.\n\n- Context: [one line of background]\n- What I need: [clear request]\n- Timeline: [date, if any]\n\nPlease let me know if you need anything else from me. Thank you for your time!\n\nBest regards,\n${mem.name||'[Your name]'}`}
+  // names
+  if(/\b(name|names)\b/.test(l)&&/(brainstorm|ideas|suggest|think|give|for my)/.test(l)){
+    const subj=(t.match(/(?:for|my|our)\s+(?:new\s+)?(.+?)[.?!]?$/i)||[,'project'])[1].replace(/^(my|our)\s+/i,'');
+    const w=caps(subj.split(' ').slice(-2).join(' '));
+    return `Name ideas for your **${subj}**:\n\n1. ${w} & Co.\n2. The Daily ${w}\n3. Little ${w}\n4. Northstar ${w}\n5. ${w} Lane\n6. Common ${w}\n\nWant them shorter, more playful, or more premium-sounding?`}
+  // summarize
+  if(/summar(i[sz]e|y)|tl;?dr|shorten/.test(l)){
+    const body=t.split(/:\s*/).slice(1).join(': ').trim();
+    if(body.length>60){const s=body.match(/[^.!?]+[.!?]*/g).map(x=>x.trim()).filter(Boolean).slice(0,5);return `**Summary**\n\n${s.map(x=>'- '+x).join('\n')}\n\n(Extractive summary — it picks the first key sentences.)`}
+    return "Sure — paste the text after a colon, like:\n\n`Summarize this text: <your text here>`\n\nand I'll boil it down into bullet points."}
+  if(/\b(weather|temperature|forecast|news|score|stock|price)\b/.test(l)) return "I can't see live data in this offline demo, so I'd only be guessing. 🌦️ A real deployment could connect a weather or news API — I can show you how it would be wired in.";
+  if(/\b(translate)\b/.test(l)) return "Translation needs a real language model, which this demo doesn't have. Connect it to an API and I'll handle it.";
+  // fallback
+  return `That's a great question about **“${t.length>70?t.slice(0,70)+'…':t}”**.\n\nI'm running in **demo mode** — a built-in rule-based responder, not a real AI — so I can't answer open-ended questions like this one. I *can* help with:\n- Maths (\`12*(4+3)\`)\n- Code (\`javascript function for palindrome\`)\n- Plans (\`plan to learn chess in 2 months\`)\n- Poems, jokes, facts, emails, name ideas, summaries\n\nTry one of those, or connect this interface to a real model API for full answers.`;
+}
+
+/* ---------- UI plumbing ---------- */
+const scroll=()=>{stage.scrollTop=stage.scrollHeight};
+const ACTS=`<div class="acts"><button type="button" data-act="copy" data-tip="Copy" aria-label="Copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg></button><button type="button" data-act="up" data-tip="Good response" aria-label="Good response"><svg viewBox="0 0 24 24"><path d="M7 11v9H4v-9zM7 11l4-8a2 2 0 012 2v4h6a2 2 0 012 2.3l-1.2 7A2 2 0 0117.8 20H7"/></svg></button><button type="button" data-act="down" data-tip="Bad response" aria-label="Bad response"><svg viewBox="0 0 24 24"><path d="M17 13V4h3v9zM17 13l-4 8a2 2 0 01-2-2v-4H5a2 2 0 01-2-2.3l1.2-7A2 2 0 016.2 4H17"/></svg></button><button type="button" data-act="redo" data-tip="Regenerate" aria-label="Regenerate"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0115-6.7L21 8M21 3v5h-5M21 12a9 9 0 01-15 6.7L3 16M3 21v-5h5"/></svg></button></div>`;
+
+function addUser(q){const d=document.createElement('div');d.className='msg user';const b=document.createElement('div');b.className='bub';b.textContent=q;d.appendChild(b);th.appendChild(d)}
+function addBot(q){
+  const o={image:$('#t-image').checked,think:$('#t-think').checked||$('#m2').checked,search:$('#t-search').checked,fast:$('#m3').checked};
+  const d=document.createElement('div');d.className='msg bot';d.dataset.q=q;
+  d.innerHTML=`<div class="av">N</div><div class="body"><div class="txt"><span class="think">${o.think?'Thinking':o.search?'Searching the web':''}</span><span class="dots"><i></i><i></i><i></i></span></div>${ACTS}</div>`;
+  th.appendChild(d);scroll();busy=true;document.body.classList.add('busy');
+  hist.push({role:'user',content:q});d.dataset.idx=hist.length;
+  live(d,o);
+}
+function stream(d,text){
+  const el=d.querySelector('.txt'),toks=text.match(/\S+\s*/g)||[];let i=0,acc='';
+  clearInterval(timer);
+  timer=setInterval(()=>{
+    acc+=toks.slice(i,i+3).join('');i+=3;el.innerHTML=md(acc);scroll();
+    if(i>=toks.length){clearInterval(timer);d.classList.add('done');busy=false;document.body.classList.remove('busy')}
+  },28);
+}
+function finish(d){d.classList.add('done');busy=false;document.body.classList.remove('busy')}
+const LS={get(k,d){try{return localStorage.getItem(k)||d}catch(e){return d}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const API_URL='/api/chat'; // Netlify redirect -> function, or local server.js
+const DEFAULT_MODEL='nvidia/nemotron-3.5-lightning:free';
+const getKey=()=>LS.get('nova_or_key','').trim(); // optional per-browser override; the server key is used otherwise
+const getModel=()=>LS.get('nova_or_model',DEFAULT_MODEL).trim()||DEFAULT_MODEL;
+const stripThink=t=>t.replace(/<think>[\s\S]*?(<\/think>|$)/g,'').replace(/^\s+/,'');
+function sysPrompt(o){
+  return [
+    "You are Nova, a friendly, capable AI assistant inside a chat web app. The user's name is Kanishk.",
+    'Answer accurately and helpfully. Keep answers as short as the question allows; go deeper only when asked.',
+    'Formatting: the app renders only a small Markdown subset. Use short paragraphs, "-" bullet lists, numbered lists, ### headings, **bold**, `inline code`, and fenced code blocks with a language tag. Do not use tables, images or HTML.',
+    'You cannot generate images or browse the web. If asked, say so briefly.',
+    o.think?'Think carefully and step by step before answering, then give a clear final answer.':'',
+    o.fast?'Be extra brief.':''
+  ].filter(Boolean).join('\n');
+}
+function dropLastUser(){if(hist.length&&hist[hist.length-1].role==='user')hist.pop()}
+async function live(d,o){
+  const el=d.querySelector('.txt'),key=getKey();
+  if(o.search)toast("Web search isn't available with this model");
+  let acc='';
+  try{
+    const r=await fetch(API_URL,{
+      method:'POST',
+      headers:Object.assign({'Content-Type':'application/json'},key?{'X-User-Key':key}:{}),
+      body:JSON.stringify({model:getModel(),stream:true,max_tokens:o.fast?1024:o.think?4096:2048,messages:[{role:'system',content:sysPrompt(o)},...hist]})
+    });
+    if(!r.ok){
+      let m='HTTP '+r.status;
+      try{const j=await r.json();m=(j.error&&j.error.message)||m}catch(e){}
+      if(r.status===401)m='OpenRouter rejected the API key. Check OPENROUTER_API_KEY on the server (or the override in Settings).';
+      else if(r.status===429)m='Rate limit reached (free models are limited). Wait a moment and try again.';
+      else if(r.status===404||r.status===400)m+=' — check the model ID in Settings.';
+      throw new Error(m);
+    }
+    const rd=r.body.getReader(),dec=new TextDecoder();let buf='';
+    for(;;){
+      const {done,value}=await rd.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf('\n'))>=0){
+        const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
+        if(!line.startsWith('data:'))continue;
+        const data=line.slice(5).trim();if(data==='[DONE]')continue;
+        let j;try{j=JSON.parse(data)}catch(e){continue}
+        if(j.error)throw new Error(j.error.message||'Stream error');
+        const c=j.choices&&j.choices[0]&&j.choices[0].delta&&j.choices[0].delta.content;
+        if(c){acc+=c;el.innerHTML=md(stripThink(acc));scroll()}
+      }
+    }
+    const out=stripThink(acc).trim();
+    if(!out)throw new Error('The model returned an empty reply. Try again or pick another model in Settings.');
+    el.innerHTML=md(out);scroll();
+    hist.push({role:'assistant',content:out});finish(d);
+  }catch(err){
+    dropLastUser();
+    const msg=(err&&err.message||'unknown error').slice(0,300).replace(/Failed to fetch/,'Network error — check your internet connection');
+    el.innerHTML=md((stripThink(acc)?stripThink(acc)+'\n\n':'')+"⚠️ **Couldn't get a reply:** "+msg);
+    finish(d);
+  }
+}
+function updateModelLabel(){const m=getModel().split('/').pop().replace(/:free$/,'');$('#modelName').textContent=m.length>24?m.slice(0,24)+'…':m}
+function loadSettings(){
+  $('#orKey').value=getKey();$('#orModel').value=getModel();
+  const k=$('#keyState');k.textContent=getKey()?'✓ Using the key saved in this browser':'Using the server key (OPENROUTER_API_KEY)';k.className='ok';
+  updateModelLabel();
+}
+function saveSettings(){
+  LS.set('nova_or_key',$('#orKey').value.trim());
+  LS.set('nova_or_model',$('#orModel').value.trim()||DEFAULT_MODEL);
+  loadSettings();toast('Settings saved');location.hash='';
+}
+function clearKey(){LS.del('nova_or_key');loadSettings();toast('API key removed')}
+function toggleKey(e){const i=$('#orKey');i.type=i.type==='password'?'text':'password';event.target.textContent=i.type==='password'?'Show':'Hide'}
+function addHistory(q){
+  const h=[...document.querySelectorAll('.history h6')].find(x=>x.textContent==='Today');
+  document.querySelectorAll('.history a.active').forEach(a=>a.classList.remove('active'));
+  const a=document.createElement('a');a.href='#';a.className='active';
+  a.innerHTML='<span></span><span class="dots">•••</span>';a.firstChild.textContent=q.length>34?q.slice(0,34)+'…':q;
+  h.after(a);histEl=a;
+}
+function ask(q){
+  document.body.classList.add('chatting');
+  if(!started){started=true;addHistory(q)}
+  addUser(q);addBot(q);
+}
+function send(e){
+  if(e)e.preventDefault();
+  const q=p.value.trim();
+  if(!q||busy)return false;
+  p.value='';ask(q);return false;
+}
+function newChat(){
+  clearInterval(timer);busy=false;started=false;th.innerHTML='';hist.length=0;
+  document.body.classList.remove('chatting','busy');
+  document.querySelectorAll('.history a.active').forEach(a=>a.classList.remove('active'));
+  p.value='';p.focus();return false;
+}
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1800)}
+
+th.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const msg=b.closest('.msg'),a=b.dataset.act;
+  if(a==='copy'){navigator.clipboard&&navigator.clipboard.writeText(msg.querySelector('.txt').innerText);toast('Copied to clipboard')}
+  if(a==='up'||a==='down'){b.classList.toggle('on');toast('Thanks for the feedback')}
+  if(a==='redo'&&!busy&&msg!==th.lastElementChild)toast('Only the latest reply can be regenerated');
+  else if(a==='redo'&&!busy){msg.querySelector('.txt').innerHTML='<span class="dots"><i></i><i></i><i></i></span>';msg.classList.remove('done');addBotRegen(msg)}
+});
+function addBotRegen(msg){
+  busy=true;document.body.classList.add('busy');
+  const o={think:$('#t-think').checked||$('#m2').checked,search:$('#t-search').checked,fast:$('#m3').checked};
+  hist.length=Math.min(hist.length,+msg.dataset.idx-1);hist.push({role:'user',content:msg.dataset.q});live(msg,o);
+}
+
+/* hello + suggestion chips (send straight away, or prefill if the prompt ends with a space) */
+const h=new Date().getHours();
+$('#hello span').textContent=(h<12?'Good morning':h<18?'Good afternoon':'Good evening')+', Kanishk. What are you working on?';
+document.querySelectorAll('.suggest button').forEach(b=>b.onclick=()=>{
+  const v=b.dataset.p;
+  if(/\s$/.test(v)){p.value=v;p.focus()} else ask(v);
+});
+p.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send()}});
+loadSettings();
+addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();newChat()}});
+</script>
+</body>
+</html>
